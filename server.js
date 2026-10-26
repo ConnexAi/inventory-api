@@ -7,23 +7,25 @@ const { Pool } = require("pg");
 const PORT = Number(process.env.PORT);
 
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
 });
 
 pool.query("SELECT NOW()").then(resultado => {
-  console.log("Conectado a PostgreSQL:", resultado.rows[0]);
+    console.log("Conectado a PostgreSQL:", resultado.rows[0]);
 });
 
 app.use(express.json());
 
+const idSchema = z.coerce.number().int().positive();
+
 const equipoSchema = z.object({
-  nombre: z.string().min(1),
-  categoria: z.string().min(1),
-  precioAlquiler: z.number().min(0),
+    nombre: z.string().min(1),
+    categoria: z.string().min(1),
+    precioAlquiler: z.number().min(0),
 });
 
 const equipoUpdateSchema = equipoSchema
@@ -31,35 +33,35 @@ const equipoUpdateSchema = equipoSchema
   .partial();
 
 app.get("/equipos", async (req, res) => {
-  let consulta = `SELECT id, nombre, categoria, precio_alquiler AS "precioAlquiler", disponible FROM equipos`;
-  const valores = [];
-  const condiciones =[];
-  if (req.query.categoria) {
-    valores.push(req.query.categoria);
-    condiciones.push(`categoria = $${valores.length}`);
-  }
-  if (req.query.disponible){
-    const disponible = req.query.disponible === "true";
-    valores.push(disponible);
-    condiciones.push(`disponible = $${valores.length}`);
-  }
-  if (condiciones.length > 0){
-    consulta = consulta + " WHERE " + condiciones.join(" AND ");
-  }
-  consulta = consulta + ` ORDER BY id`;
-  const resultado = await pool.query(consulta, valores);
-  res.json(resultado.rows);
+    let consulta = `SELECT id, nombre, categoria, precio_alquiler AS "precioAlquiler", disponible FROM equipos`;
+    const valores = [];
+    const condiciones =[];
+    if (req.query.categoria) {
+        valores.push(req.query.categoria);
+        condiciones.push(`categoria = $${valores.length}`);
+    }
+    if (req.query.disponible){
+        const disponible = req.query.disponible === "true";
+        valores.push(disponible);
+        condiciones.push(`disponible = $${valores.length}`);
+    }
+    if (condiciones.length > 0){
+        consulta = consulta + " WHERE " + condiciones.join(" AND ");
+    }
+    consulta = consulta + ` ORDER BY id`;
+    const resultado = await pool.query(consulta, valores);
+    res.json(resultado.rows);
 });
 
 app.get("/equipos/:id", async (req, res) => {
-    const id = Number(req.params.id);
-    if (Number.isNaN(id)) {
-        return res.status(400).json({ error: "ID inválido" });
+    const validateId = idSchema.safeParse(req.params.id);
+    if (!validateId.success) {
+        return res.status(400).json({ error: "ID inválido", detalles: validateId.error.issues});
     }
     const resultado = await pool.query(`SELECT id, nombre, categoria, precio_alquiler AS "precioAlquiler", 
         disponible FROM equipos WHERE id = $1`, 
-        [id]
-    )
+        [validateId.data]
+    );
     const equipo = resultado.rows[0];
     if (!equipo) {
         return res.status(404).json({ error: "Equipo no encontrado" });
@@ -70,7 +72,7 @@ app.get("/equipos/:id", async (req, res) => {
 app.post("/equipos", async (req, res) => {
     const resultado = equipoSchema.safeParse(req.body); 
     if (!resultado.success){
-        return res.status(400).json({error: "Datos inválidos", detalles: resultado.error.issues })
+        return res.status(400).json({error: "Datos inválidos", detalles: resultado.error.issues });
     }
     const consulta  = await pool.query(`INSERT INTO equipos(nombre, categoria, precio_alquiler)
         VALUES ($1, $2, $3)
@@ -82,25 +84,25 @@ app.post("/equipos", async (req, res) => {
 });
 
 app.delete("/equipos/:id", async (req, res) => {
-    const id =Number(req.params.id);
-    if (Number.isNaN(id)){
-        return res.status(400).json({ error: "ID inválido"});
+    const validateId = idSchema.safeParse(req.params.id);
+    if (!validateId.success){
+        return res.status(400).json({ error: "ID inválido", detalles: validateId.error.issues });
     }
-    const consulta =await pool.query(`DELETE FROM equipos WHERE id = $1`, [id]);
+    const consulta = await pool.query(`DELETE FROM equipos WHERE id = $1`, [validateId.data]);
     if (consulta.rowCount === 0){
-        return res.status(404).json ({error: "Equipo no encontrado ni eliminado"})
+        return res.status(404).json ({error: "Equipo no encontrado ni eliminado"});
     }
     res.status(204).send();
 });
 
 app.patch("/equipos/:id", async (req, res) => {
-    const id =Number(req.params.id);
-    if (Number.isNaN(id)){
-        return res.status(400).json({ error: "ID inválido"});
+    const validateId = idSchema.safeParse(req.params.id);
+    if (!validateId.success){
+        return res.status(400).json({ error: "ID inválido", detalles: validateId.error.issues });
     }
     const resultado = equipoUpdateSchema.safeParse(req.body);
     if (!resultado.success){
-        return res.status(400).json({error: "Datos inválidos", detalles: resultado.error.issues})
+        return res.status(400).json({error: "Datos inválidos", detalles: resultado.error.issues});
     }
     const valores = [];
     const cambios = [];
@@ -122,9 +124,9 @@ app.patch("/equipos/:id", async (req, res) => {
     }
 
     if (cambios.length === 0){
-        return res.status(400).json({error: "No hay campos para actualizar"})
+        return res.status(400).json({error: "No hay campos para actualizar"});
     }
-    valores.push (id);
+    valores.push (validateId.data);
 
     const consulta = await pool.query(
         `UPDATE equipos SET ${cambios.join(", ")} WHERE id = $${valores.length}
