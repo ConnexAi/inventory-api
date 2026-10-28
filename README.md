@@ -39,7 +39,7 @@ It runs on http://localhost:3000
 
 I made 5 endpoints to cover the full CRUD:
 
-- `GET /equipos` returns all the equipment. You can filter with `?categoria=` or `?disponible=true`
+- `GET /equipos` returns all the equipment. You can filter with `?categoria=` or `?disponible=true` the querys are validated with zod
 - `GET /equipos/:id` returns one equipment by its id
 - `POST /equipos` creates a new equipment, the body is validated with Zod
 - `PATCH /equipos/:id` updates only the fields you send and returns the updated equipment
@@ -56,6 +56,5 @@ If the input is wrong it returns 400, and if the id doesn't exist it returns 404
 
 ## What's next
 
-- Validate the id and the filters with Zod too
 - Move it to TypeScript
 - Add tests with Vitest and Supertest
