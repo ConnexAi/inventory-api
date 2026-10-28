@@ -20,6 +20,11 @@ pool.query("SELECT NOW()").then(resultado => {
 
 app.use(express.json());
 
+const filtroSchema = z.object({
+    disponible: z.enum(["true", "false"]).transform((valor) => valor === "true").optional(),
+    categoria: z.string().min(1).optional(),
+});
+
 const idSchema = z.coerce.number().int().positive();
 
 const equipoSchema = z.object({
@@ -33,16 +38,19 @@ const equipoUpdateSchema = equipoSchema
   .partial();
 
 app.get("/equipos", async (req, res) => {
+    const validateFilter = filtroSchema.safeParse(req.query);
+    if (!validateFilter.success){
+        return res.status(400).json({error: "filtro inválido", detalles: validateFilter.error.issues});
+    }
     let consulta = `SELECT id, nombre, categoria, precio_alquiler AS "precioAlquiler", disponible FROM equipos`;
     const valores = [];
     const condiciones =[];
-    if (req.query.categoria) {
-        valores.push(req.query.categoria);
+    if (validateFilter.data.categoria) {
+        valores.push(validateFilter.data.categoria);
         condiciones.push(`categoria = $${valores.length}`);
     }
-    if (req.query.disponible){
-        const disponible = req.query.disponible === "true";
-        valores.push(disponible);
+    if (validateFilter.data.disponible !== undefined){
+        valores.push(validateFilter.data.disponible);
         condiciones.push(`disponible = $${valores.length}`);
     }
     if (condiciones.length > 0){
